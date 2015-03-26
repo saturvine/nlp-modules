@@ -1,83 +1,55 @@
 # -*- coding: utf-8 -*-
-import nltk     # nltk library 
-import yaml     # yaml parser and emitter for python 
-import sys      # system library 
-import re       # regular expressions 
-import os       # operating system interfaces library 
+import nltk    
+import yaml     
+import sys     
+import re      
+import os       
 
-""" pretty print for object printing in format
-    that can be used as input for interpreter """
 from pprint import pprint
 
 
-""" class splitter """
 class Splitter(object):
-
-    """ constructor """
-    def __init__(self):
-        
-        """ this tokenizer divides a text into a list of sentences,
-            by using an unsupervised algorithm to build a model for abbreviation words,
-            collocations, and words that start sentences. """
+  
+    def __init__(self):      
         
         self.nltk_splitter = nltk.data.load('tokenizers/punkt/english.pickle')
         self.nltk_tokenizer = nltk.tokenize.TreebankWordTokenizer()
 
     def split(self, text):
-        """
-        input format: a paragraph of text
-        output format: a list of lists of words.
-            e.g.: [['this', 'is', 'a', 'sentence'], ['this', 'is', 'another', 'one']]
-        """
-
-        """ spilts into sentences """
-        sentences = self.nltk_splitter.tokenize(text)
-        """ splits each sentence into token of words """
+     
+        sentences = self.nltk_splitter.tokenize(text)       
         tokenized_sentences = [self.nltk_tokenizer.tokenize(sent) for sent in sentences]
         return tokenized_sentences
 
 
-""" class postagger """
 class POSTagger(object):
-
-    """ constructor """
+    
     def __init__(self):
         pass
         
     def pos_tag(self, sentences):
-        """
-        input format: list of lists of words
-            e.g.: [['this', 'is', 'a', 'sentence'], ['this', 'is', 'another', 'one']]
-        output format: list of lists of tagged tokens. Each tagged tokens has a
-        form, a lemma, and a list of tags
-            e.g: [[('this', 'this', ['DT']), ('is', 'be', ['VB']), ('a', 'a', ['DT']), ('sentence', 'sentence', ['NN'])],
-                    [('this', 'this', ['DT']), ('is', 'be', ['VB']), ('another', 'another', ['DT']), ('one', 'one', ['CARD'])]]
-        """
-
-        pos = [nltk.pos_tag(sentence) for sentence in sentences]
-        #adapt format
+      
+        pos = [nltk.pos_tag(sentence) for sentence in sentences]     
         pos = [[(word, word, [postag]) for (word, postag) in sentence] for sentence in pos]
         return pos
 
 class DictionaryTagger(object):
 
     def __init__(self, dictionary_paths):
-        """ get files using paths with read access """
+       
         files = [open(path, 'r') for path in dictionary_paths]
-        """ make dictionary out of files """
+       
         dictionaries = [yaml.load(dict_file) for dict_file in files]
-        """ close all files """
+       
         map(lambda x: x.close(), files)
         self.dictionary = {}
         self.max_key_size = 0
-        """ for each dictionary """
+       
         for curr_dict in dictionaries:
             for key in curr_dict:
-                if key in self.dictionary:
-                    """ append """
+                if key in self.dictionary:             
                     self.dictionary[key].extend(curr_dict[key])                    
-                else:
-                    """ add key """
+                else:                   
                     self.dictionary[key] = curr_dict[key]                    
                     self.max_key_size = max(self.max_key_size, len(key))
                 
@@ -85,20 +57,14 @@ class DictionaryTagger(object):
     def tag(self, postagged_sentences):
         return [self.tag_sentence(sentence) for sentence in postagged_sentences]
 
-    def tag_sentence(self, sentence, tag_with_lemmas=False):
-        """
-        the result is only one tagging of all the possible ones.
-        The resulting tagging is determined by these two priority rules:
-            - longest matches have higher priority
-            - search is made from left to right
-        """
+    def tag_sentence(self, sentence, tag_with_lemmas=False):       
         tag_sentence = []
         N = len(sentence)
         if self.max_key_size == 0:
             self.max_key_size = N
         i = 0
         while (i < N):
-            j = min(i + self.max_key_size, N) #avoid overflow
+            j = min(i + self.max_key_size, N)
             tagged = False
             while (j > i):
                 expression_form = ' '.join([word[0] for word in sentence[i:j]]).lower()
@@ -108,13 +74,13 @@ class DictionaryTagger(object):
                 else:
                     literal = expression_form
                 if literal in self.dictionary:
-                    #self.logger.debug("found: %s" % literal)
+                   
                     is_single_token = j - i == 1
                     original_position = i
                     i = j
                     taggings = [tag for tag in self.dictionary[literal]]
                     tagged_expression = (expression_form, expression_lemma, taggings)
-                    if is_single_token: #if the tagged literal is a single token, conserve its previous taggings:
+                    if is_single_token: 
                         original_token_tagging = sentence[original_position][2]
                         tagged_expression[2].extend(original_token_tagging)
                     tag_sentence.append(tagged_expression)
